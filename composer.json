@@ -1,6 +1,6 @@
 {
     "name": "neutromelabs/magento2-headless-components",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "description": "Simple phtml template rendering without XML layout. Includes caching, theming via native Magento overrides, and first-class AlpineJS support.",
     "type": "magento2-module",
     "license": "GPL-3.0-or-later",
