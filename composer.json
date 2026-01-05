@@ -1,10 +1,11 @@
 {
     "name": "neutromelabs/magento2-headless-components",
-    "version": "0.1.0",
-    "description": "Provides a simple way to render phtml-based templates, without the need to register them in the xml layout batteries included (caching, theming, first-class AlpineJS support, etc.).",
+    "version": "0.2.0",
+    "description": "Simple phtml template rendering without XML layout. Includes caching, theming via native Magento overrides, and first-class AlpineJS support.",
     "type": "magento2-module",
     "license": "GPL-3.0-or-later",
     "require": {
+        "php": "^8.1",
         "magento/framework": "*"
     },
     "autoload": {
@@ -12,7 +13,7 @@
             "src/HeadlessComponents/registration.php"
         ],
         "psr-4": {
-            "NeutromeLabs\\HeadlessComponents\\": "src\\HeadlessComponents"
+            "NeutromeLabs\\HeadlessComponents\\": "src/HeadlessComponents"
         }
     },
     "repositories": {

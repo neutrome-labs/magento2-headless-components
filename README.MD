@@ -4,8 +4,8 @@
 # Magento 2 Headless Components Module
 
 Provides a simple way to render phtml-based templates,
-without the need to register them in the xml layout
-batteries included (caching, theming, first-class AlpineJS support, etc.).
+without the need to register them in the xml layout.
+Includes caching, native Magento theme overrides, and first-class AlpineJS support.
 
 ## Overview
 
@@ -19,38 +19,39 @@ This is a tool to do a
 ```
 in a "better" way:
 
-* Theming
-* Caching
-* FPC
-* JS-compainion blocks
+* Native Magento theme overrides
+* Block caching
+* FPC compatible
+* JS-companion blocks for AlpineJS
 
 ### The Problem
 
-1) Magento 2 has no ability just to write smth like {{ templates/button }}
-to render templates as an almost every other templating engines.
-2) AlpineJS-based themes and components becomes hard to upgrade when overwritten,
+1) Magento 2 has no ability to simply render templates like `{{ templates/button }}`
+as almost every other templating engine provides.
+2) AlpineJS-based themes and components become hard to upgrade when overwritten,
 because of the need to copy-paste the whole JS logic within the template.
 
 ### Proposed Solution
 
-This module adds ability for other modules to make use of easier way
-to render templates in a simpler way, along with the first-class AlpineJS support
-via decoupling the JS logic from the templates, caching and FPC support,
-and theming out-of-the-box.
-Thus the layout system is used for macro-level layouting (`header`, `footer`, `product-details`),
-and the Headless Components for the atom/block level - `button`, `input`, `accordion`.
+This module provides an easier way to render templates, with first-class AlpineJS support
+via decoupling JS logic from templates into `.script.phtml` companion files.
+The layout system is used for macro-level layouting (`header`, `footer`, `product-details`),
+and Headless Components for atom/block level - `button`, `input`, `accordion`.
 
-## Where To Use
+## Installation
 
-When you building a module, which views will be overridden by the end users,
-or just want to get rid of xml hell - this module is for you :).
+```bash
+composer require neutromelabs/magento2-headless-components
+bin/magento setup:upgrade
+```
 
 ## How To Use
+
+### Basic Usage
 
 ```php
 /** view/frontend/templates/some/template.phtml */
 
-//  call to the renderer fn           with a (template path,     parameters,
 <?= $block->headlessComponentRenderer->render('atom/input-text', [
     'type' => 'email',
     'name' => 'email',
@@ -61,55 +62,56 @@ or just want to get rid of xml hell - this module is for you :).
         'x-model' => 'displayEmail',
         '@change' => 'await save()'
     ]
-// and the name in the virtual DOM)
 ], 'address-form.input-email') ?>
+```
 
-// and once more
-<?= $block->headlessComponentRenderer->render('block/messages', [
-    'scope' => 'address-form',
-], 'address-form.messages') ?>
+### Configuration
 
+Configure the component module via DI:
+
+```xml
+<!-- di.xml -->
+<type name="NeutromeLabs\HeadlessComponents\Service\Renderer">
+    <arguments>
+        <argument name="componentModule" xsi:type="string">Vendor_MyComponents</argument>
+    </arguments>
+</type>
+```
+
+Then create your templates:
+```
+Vendor/MyComponents/view/frontend/templates/atom/input-text.phtml
+Vendor/MyComponents/view/frontend/templates/atom/input-text.script.phtml  <!-- AlpineJS companion -->
+```
+
+### Overriding Components
+
+Use standard Magento theme overrides:
+```
+app/design/frontend/Vendor/theme/Vendor_MyComponents/templates/atom/input-text.phtml
+```
+
+### Script Companions (AlpineJS)
+
+For any template `foo/bar.phtml`, create `foo/bar.script.phtml` for the JS logic.
+The script companion is automatically detected and rendered once per page in `before.body.end`.
+
+```html
+<!-- atom/button.phtml -->
+<button x-data="myButton()" @click="handleClick">
+    <span x-text="label"></span>
+</button>
 ```
 
 ```html
-/** view/frontend/templates/component/headless/block/messages.phtml */
-
-<? $scope = $block->getData('scope'); ?>
-<div x-data="myVendorModuleHeadlessCreateMessages()"
-     @myvendormodulemessage-<?= $scope ?>.window="add($event.detail)">
-    <template x-if="messages.length > 0">
-        <ul>
-            <template x-for="message in messages">
-                <li style="border: 1px solid black; margin-bottom: 10px;">
-                    <span x-text="message.text"></span>
-                </li>
-            </template>
-        </ul>
-    </template>
-</div>
-```
-
-```html
-/** view/frontend/templates/component/headless/block/messages.script.phtml */
-
+<!-- atom/button.script.phtml -->
 <script>
-    myVendorModuleHeadlessCreateMessages = function () {
-        return {
-            messages: [],
-            add: function (message) {
-                if (!message?.id) {
-                    message.id = Math.random().toString(36).substring(7);
-                }
-
-                this.messages.push(message);
-                setTimeout(() => {
-                    this.remove(message.id);
-                }, 3000);
-            },
-            ...
-        };
-    };
+function myButton() {
+    return {
+        label: 'Click me',
+        handleClick() {
+            console.log('clicked');
+        }
+    }
+}
 </script>
-```
-
-See full example in the [EXAMPLE.MD](EXAMPLE.MD)

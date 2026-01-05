@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NeutromeLabs\HeadlessComponents\Block;
 
 use Magento\Framework\View\Element\Template;
@@ -8,17 +10,15 @@ use NeutromeLabs\HeadlessComponents\Service\Renderer;
 
 class Headless extends Template
 {
-
     public function __construct(
         public readonly AttributesHtmlGenerator $attributesHtmlGenerator,
-        public readonly Template\Context        $context,
-        array                                   $data = []
-    )
-    {
+        Template\Context $context,
+        array $data = []
+    ) {
         parent::__construct($context, $data);
     }
 
-    public function getRenderer(): Renderer
+    public function getRenderer(): ?Renderer
     {
         return $this->getData('renderer');
     }
@@ -32,15 +32,16 @@ class Headless extends Template
         return $this->getData('slug');
     }
 
-    public function getNameInLayout()
+    public function getNameInLayout(): string
     {
-        return parent::getNameInLayout() ?? ("headless." . $this->getSlug());
+        return parent::getNameInLayout() ?? ('headless.' . $this->getSlug());
     }
 
-    public function getCacheKeyInfo()
+    public function getCacheKeyInfo(): array
     {
         $info = parent::getCacheKeyInfo();
         $info['headless'] = $this->getNameInLayout();
+
         return $info;
     }
 }

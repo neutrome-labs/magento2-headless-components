@@ -1,24 +1,22 @@
 <?php
 
+declare(strict_types=1);
+
 namespace NeutromeLabs\HeadlessComponents\Service;
 
 use Magento\Framework\View\LayoutInterface;
-use NeutromeLabs\HeadlessComponents\Api\ThemeInterface;
-use NeutromeLabs\HeadlessComponents\Api\ThemeManagerInterface;
 use NeutromeLabs\HeadlessComponents\Block\Headless;
 use NeutromeLabs\HeadlessComponents\Block\HeadlessFactory;
 
 class Renderer
 {
-
-    private array $bakedSingletonCompanions = [];
+    private array $renderedScriptCompanions = [];
 
     public function __construct(
-        private readonly LayoutInterface       $layout,
-        private readonly HeadlessFactory       $blockFactory,
-        private readonly ThemeManagerInterface $themeManager,
-    )
-    {
+        private readonly LayoutInterface  $layout,
+        private readonly HeadlessFactory  $blockFactory,
+        private readonly string           $componentModule = 'NeutromeLabs_HeadlessComponents',
+    ) {
     }
 
     public function isShortTemplate(string $template): bool
@@ -26,10 +24,7 @@ class Renderer
         return !str_contains($template, '::');
     }
 
-    public function createBlockInstance(
-        array   $data,
-        ?string $slug
-    ): Headless
+    public function createBlockInstance(array $data, ?string $slug): Headless
     {
         return $this->blockFactory
             ->create()
@@ -39,29 +34,18 @@ class Renderer
             ], $data));
     }
 
-    private function renderRecursive(Headless $block, ?string $template, ?ThemeInterface $theme = null): string
+    private function resolveTemplate(string $template): string
     {
-        $theme = $theme ?? $this->themeManager->current();
-
-        if ($template && $this->isShortTemplate($template)) {
-            $fullTemplate = $theme->getModule() . "::$template.phtml";
+        if ($this->isShortTemplate($template)) {
+            return "{$this->componentModule}::{$template}.phtml";
         }
 
-        if (isset($fullTemplate) && $fullTemplate) {
-            $block->setTemplate($fullTemplate);
-        } else if ($template) {
-            $block->setTemplate($template);
-        }
+        return $template;
+    }
 
-        if (!$block->getTemplateFile()) {
-            if (
-                isset($fullTemplate)
-                && $theme->getParent()
-                && ($parentTheme = $this->themeManager->find($theme->getParent()))
-            ) {
-                return $this->renderRecursive($block, $template, $parentTheme);
-            }
-        }
+    private function renderBlock(Headless $block, string $template): string
+    {
+        $block->setTemplate($this->resolveTemplate($template));
 
         return $block->toHtml();
     }
@@ -70,40 +54,45 @@ class Renderer
         string  $template,
         array   $data = [],
         ?string $slug = null,
-        string $scriptLayoutParent = 'before.body.end'
-    ): string
-    {
-        $possibleScriptCompanionTemplate = $this->isShortTemplate($template)
-            ? "$template.script"
-            : str_replace('.phtml', '.script.phtml', $template);
-
+        string  $scriptLayoutParent = 'before.body.end'
+    ): string {
         $html = '';
 
-        $scriptCompanionBlock = $this->createBlockInstance($data, $slug . '_script');
+        // Handle script companion (e.g., atom/button.script.phtml for AlpineJS logic)
+        $scriptTemplate = $this->isShortTemplate($template)
+            ? "{$template}.script"
+            : str_replace('.phtml', '.script.phtml', $template);
 
-        // side effect: sets proper template before inserting into layout
+        $scriptBlock = $this->createBlockInstance($data, $slug ? "{$slug}_script" : null);
+
         try {
-            $canRenderCompanion = (bool)$this->renderRecursive($scriptCompanionBlock, $possibleScriptCompanionTemplate);
-        } catch (\Exception $e) {
-            $canRenderCompanion = false;
+            $scriptHtml = $this->renderBlock($scriptBlock, $scriptTemplate);
+            $canRenderScript = (bool) $scriptHtml;
+        } catch (\Exception) {
+            $canRenderScript = false;
         }
 
-        if ($canRenderCompanion) {
-            if (count($this->layout->getAllBlocks()) > 0) {
-                if (!array_key_exists($possibleScriptCompanionTemplate, $this->bakedSingletonCompanions)) {
+        if ($canRenderScript) {
+            $scriptKey = $this->resolveTemplate($scriptTemplate);
+
+            if (!isset($this->renderedScriptCompanions[$scriptKey])) {
+                if (count($this->layout->getAllBlocks()) > 0) {
+                    // Layout available: add to layout for proper placement
                     $this->layout->addBlock(
-                        $scriptCompanionBlock,
-                        $scriptCompanionBlock->getNameInLayout(),
+                        $scriptBlock,
+                        $scriptBlock->getNameInLayout(),
                         $scriptLayoutParent
                     );
-                    $this->bakedSingletonCompanions[$possibleScriptCompanionTemplate] = true;
+                } else {
+                    // No layout (e.g., AJAX): render inline
+                    $html .= $scriptHtml;
                 }
-            } else {
-                $html .= $this->renderRecursive($scriptCompanionBlock, null);
+                $this->renderedScriptCompanions[$scriptKey] = true;
             }
         }
 
-        $html .= $this->renderRecursive($this->createBlockInstance($data, $slug), $template);
+        // Render main component
+        $html .= $this->renderBlock($this->createBlockInstance($data, $slug), $template);
 
         return $html;
     }
